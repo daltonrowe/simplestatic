@@ -1,0 +1,1 @@
+node --watch-path=./pages build.js
