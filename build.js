@@ -1,33 +1,37 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+let file = process.argv.findIndex(
+  (s) => s.includes("--file") || s.includes("-f"),
+);
+
+file = file !== -1 ? process.argv[file + 1] : undefined;
+
+const pagesPath = path.join(import.meta.dirname, "pages");
 const distPath = path.join(import.meta.dirname, "dist");
+const templatesPath = path.join(import.meta.dirname, "templates");
 const templatesCache = {};
 
 function reset() {
-  const distExists = fs.existsSync(distPath);
-
-  if (distExists) fs.rmSync(distPath, { recursive: true });
+  if (fs.existsSync(distPath)) fs.rmSync(distPath, { recursive: true });
   fs.mkdirSync(distPath);
 }
 
-reset();
+function writeFile(destination, content) {
+  const dir = destination.split("/").slice(0, -1).join("/");
+  if (dir) fs.mkdirSync(path.join(distPath, dir), { recursive: true });
+  fs.writeFileSync(path.join(distPath, destination), content, {
+    encoding: "utf-8",
+  });
+}
 
 function loadTemplate(name) {
   if (templatesCache[name]) return templatesCache[name];
 
-  const templatePath = path.join(
-    import.meta.dirname,
-    "templates",
-    `${name}.html`,
-  );
-
-  const template = fs.readFileSync(templatePath, {
-    encoding: "utf-8",
-  });
+  const templatePath = path.join(templatesPath, `${name}.html`);
+  const template = fs.readFileSync(templatePath, { encoding: "utf-8" });
 
   templatesCache[name] = template;
-
   return template;
 }
 
@@ -51,48 +55,34 @@ function copyStatic(dirs) {
 
 function collectMeta(content) {
   const [filemeta, html] = content.split("%%%");
-
-  const meta = {
-    html: html?.trim(),
-    template: "default",
-  };
+  const meta = { template: "default", html: html?.trim() };
 
   const json = JSON.parse(filemeta);
-
-  for (const key of Object.keys(json)) {
-    meta[key] = json[key] ?? "";
-  }
+  for (const key of Object.keys(json)) meta[key] = json[key] ?? "";
 
   return meta;
 }
 
-function writePage(filename, content) {
+function createPage(destination, content) {
   const meta = collectMeta(content);
   const template = loadTemplate(meta.template);
-
-  if (meta.html) {
-    const generated = fillTemplate(template, meta);
-
-    const distFilePath = path.join(distPath, `${filename.split(".")[0]}.html`);
-
-    fs.writeFileSync(distFilePath, generated, {
-      encoding: "utf-8",
-      recursive: true,
-    });
-  }
+  writeFile(destination, fillTemplate(template, meta));
 }
 
-function generate(entry) {
-  const entryDir = entry ? `pages/${entry}` : 'pages'
+function generate(entry = "") {
+  const entryPath = path.join(pagesPath, entry);
+  const relativePath = path.relative(pagesPath, entryPath);
 
-  if (fs.statSync(entryDir).isFile()) {
-    const content = fs.readFileSync(entryDir, { encoding: "utf-8" });
-    writePage(entry, content);
-  } else {
-    const dir = fs.readdirSync(entryDir);
-    for (const item in dir) generate(item);
+  if (fs.statSync(entryPath).isDirectory()) {
+    const dir = fs.readdirSync(entryPath);
+    for (const item of dir) generate(path.join(relativePath, item));
+    return;
   }
+
+  const content = fs.readFileSync(entryPath, { encoding: "utf-8" });
+  createPage(relativePath, content);
 }
 
+if (!file) reset();
 copyStatic(["css", "img", "js"]);
-generate("index.html");
+generate(file);
