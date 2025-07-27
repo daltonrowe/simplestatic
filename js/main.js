@@ -1,1 +1,1 @@
-console.debug('hey!');
+console.debug("hey!");
