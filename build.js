@@ -54,11 +54,14 @@ function copyStatic(dirs) {
 }
 
 function collectMeta(content) {
-  const [filemeta, html] = content.split("%%%");
+  const [filemeta, html, ...rest] = content.split("%%%");
+
   const meta = { template: "default", html: html?.trim() };
 
   const json = JSON.parse(filemeta);
   for (const key of Object.keys(json)) meta[key] = json[key] ?? "";
+  for (const i in rest)
+    meta[`html_${Number.parseInt(i) + 2}`] = rest[i]?.trim() ?? "";
 
   return meta;
 }
