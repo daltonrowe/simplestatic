@@ -39,8 +39,10 @@ function loadTemplate(name) {
 function fillTemplate(template, meta) {
   let markup = template;
 
-  for (const key in meta) {
-    markup = markup.replaceAll(`{{${key}}}`, meta[key]);
+  const slots = markup.match(/\{\{([^}]*)\}\}/g, "");
+  for (const slot of slots) {
+    const key = slot.substring(2, slot.length - 2);
+    markup = markup.replaceAll(slot, meta[key] ?? "");
   }
 
   return markup;
@@ -55,14 +57,14 @@ function copyStatic(dirs) {
 }
 
 function collectMeta(content) {
-  const [filemeta, html, ...rest] = content.split("%%%");
+  const [filemeta, html, ...more_html] = content.split("%%%");
 
   const meta = { template: "default", html: html?.trim() };
 
   const json = JSON.parse(filemeta);
   for (const key of Object.keys(json)) meta[key] = json[key] ?? "";
-  for (const i in rest)
-    meta[`html_${Number.parseInt(i) + 2}`] = rest[i]?.trim() ?? "";
+  for (const i in more_html)
+    meta[`html_${Number.parseInt(i) + 2}`] = more_html[i]?.trim() ?? "";
 
   return meta;
 }
@@ -87,6 +89,9 @@ function generate(entry = "") {
   createPage(relativePath, content);
 }
 
-if (!file) reset();
-copyStatic(["css", "img", "js"]);
+if (!file) {
+  reset();
+  copyStatic(["css", "img", "js"]);
+}
+
 generate(file);
